@@ -32,7 +32,7 @@ enum class ErrorCode : uint_fast16_t {
 
     FILAMENT_ALREADY_LOADED = 0x8005, ///< E32773 cannot perform operation LoadFilament or move the selector as the filament is already loaded
 
-    INVALID_TOOL = 0x8006, ///< E32774 tool/slot index out of range (typically issuing T5 into an MMU with just 5 slots - valid range 0-4)
+    INVALID_TOOL = 0x8006, ///< E32774 tool/slot index out of range (valid range is 0 .. MMU_FILAMENT_COUNT-1; a 5-slot MMU rejects T5)
 
     HOMING_FAILED = 0x8007, ///< generic homing failed error - always reported with the corresponding axis bit set (Idler or Selector) as follows:
     HOMING_SELECTOR_FAILED = HOMING_FAILED | TMC_SELECTOR_BIT, ///< E32903 the Selector was unable to home properly - that means something is blocking its movement

@@ -142,10 +142,10 @@ public:
     /// @returns true
     bool loading_test(uint8_t slot);
 
-    /// @returns the active filament slot index (0-4) or 0xff in case of no active tool
+    /// @returns the active filament slot index (0 .. MMU_FILAMENT_COUNT-1) or 0xff if no tool is active
     uint8_t get_current_tool() const;
 
-    /// @returns The filament slot index (0 to 4) that will be loaded next, 0xff in case of no active tool change
+    /// @returns The filament slot index (0 .. MMU_FILAMENT_COUNT-1) that will be loaded next, 0xff if no tool change is active
     uint8_t get_tool_change_tool() const;
 
     bool set_filament_type(uint8_t slot, uint8_t type);

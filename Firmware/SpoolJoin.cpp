@@ -3,6 +3,7 @@
 #include "eeprom.h"
 #include "messages.h"
 #include "language.h"
+#include "mmu_slot.h"
 
 namespace SpoolJoin {
 
@@ -55,8 +56,7 @@ uint8_t SpoolJoin::nextSlot()
     SERIAL_ECHOPGM("SpoolJoin: ");
     SERIAL_ECHO((int)currentMMUSlot);
 
-    if (currentMMUSlot >= 4) currentMMUSlot = 0;
-    else currentMMUSlot++;
+    currentMMUSlot = mmu_spooljoin_next(currentMMUSlot, MMU_FILAMENT_COUNT);
 
     SERIAL_ECHOPGM(" -> ");
     SERIAL_ECHOLN((int)currentMMUSlot);

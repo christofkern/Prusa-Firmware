@@ -31,13 +31,14 @@ public:
     /// @param slot number of the slot to set
     void setSlot(uint8_t slot);
 
-    /// @brief Fetch the next slot number should count from 0 to 4.
-    /// When filament slot 4 is depleted, the next slot should be 0.
-    /// @returns the next slot, ranges from 0 to 4
+    /// @brief Fetch the next slot number.
+    /// Slots run from 0 through MMU_FILAMENT_COUNT - 1.
+    /// After the last slot is depleted, the next slot is 0.
+    /// @returns the next slot
     uint8_t nextSlot();
 
 private:
-    /// @brief Currently used slot, ranges from 0 to 4
+    /// @brief Currently used slot, from 0 through MMU_FILAMENT_COUNT - 1
     uint8_t currentMMUSlot;
 };
 

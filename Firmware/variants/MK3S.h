@@ -670,7 +670,11 @@
 //#define SUPPORT_VERBOSITY
 
 #define MMU_CONFIG_FILE "mmu2/variants/config_MMU2S.h"
-#define MMU_FILAMENT_COUNT 5
+// MMU12x: this MK3S/MK3S+ build addresses 12 filament slots (tools T0-T11,
+// shown as filaments 1-12). Set this back to 5 to restore the stock
+// MMU2S/MMU3 limits. Other printer variants keep their own count.
+// The printer still has one extruder; do not raise EXTRUDERS. See MMU12X.md.
+#define MMU_FILAMENT_COUNT 12
 //#define MMU_FORCE_STEALTH_MODE
 #define MMU_HWRESET
 #define MMU_DEBUG //print communication between MMU and printer on serial

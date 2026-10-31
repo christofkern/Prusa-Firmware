@@ -39,7 +39,7 @@ extern void ReportErrorHookDynamicRender(void){
     lcd_putc_at(3, 2, mmu2.FindaDetectsFilament() + '0');
     lcd_putc_at(8, 2, fsensor.getFilamentPresent() + '0');
 
-    // print active/changing filament slot
+    // Filament field is at most 5 columns (10..14). Column 15 stays the thermometer.
     lcd_set_cursor(10, 2);
     lcdui_print_extruder();
 
@@ -372,9 +372,7 @@ void MakeSound(SoundType s){
 static void FullScreenMsg(const char *pgmS, uint8_t slot){
     lcd_update_enable(false);
     lcd_clear();
-    lcd_puts_at_P(0, 1, pgmS);
-    lcd_print(' ');
-    lcd_print(slot + 1);
+    lcd_append_mmu_filament_number_P(pgmS, 1, slot);
 }
 
 void FullScreenMsgCut(uint8_t slot){

@@ -3172,9 +3172,7 @@ static void mmu_M600_unload_filament() {
 
     lcd_update_enable(false);
     lcd_clear();
-    lcd_puts_at_P(0, 1, _T(MSG_UNLOADING_FILAMENT));
-    lcd_print(' ');
-    lcd_print(MMU2::mmu2.get_current_tool() + 1);
+    lcd_append_mmu_filament_number_P(_T(MSG_UNLOADING_FILAMENT), 1, MMU2::mmu2.get_current_tool());
 
     // unload just current filament for multimaterial printers (used also in M702)
     MMU2::mmu2.unload();
@@ -7871,7 +7869,7 @@ void process_commands()
         M701 [ P | T | L | Z ]
 
     #### Parameters
-    - `P` - n index of MMU slot (zero based, so 0-4 like T0 and T4)
+    - `P` - n index of MMU slot (zero based, T0 through T(MMU_FILAMENT_COUNT-1))
     - `T` - Alias of `P`. Used for compatibility with Marlin
     - `L` - Extrude distance for insertion (positive value)(manual reload)
     - `Z` - Move the Z axis by this distance. Default value is 0 to maintain backwards compatibility with older gcodes.
@@ -7943,7 +7941,7 @@ void process_commands()
         M704 [ P ]
 
     #### Parameters
-    - `P` - n index of slot (zero based, so 0-4 like T0 and T4)
+    - `P` - n index of slot (zero based, T0 through T(MMU_FILAMENT_COUNT-1))
     */
     case 704:
     {
@@ -7958,7 +7956,7 @@ void process_commands()
         M705 [ P ]
 
     #### Parameters
-    - `P` - n index of slot (zero based, so 0-4 like T0 and T4)
+    - `P` - n index of slot (zero based, T0 through T(MMU_FILAMENT_COUNT-1))
     */
     case 705:
     {
@@ -7974,7 +7972,7 @@ void process_commands()
         M706 [ P ]
 
     #### Parameters
-    - `P` - n index of slot (zero based, so 0-4 like T0 and T4)
+    - `P` - n index of slot (zero based, T0 through T(MMU_FILAMENT_COUNT-1))
     */
     case 706:
     {
@@ -8115,7 +8113,7 @@ void process_commands()
   // end if(code_seen('M')) (end of M codes)
   /*!
   -----------------------------------------------------------------------------------------
-  T<extruder nr.> - select extruder in case of multi extruder printer. Selects filament position 1-5 (T0-T4) in case of MMU.
+  T<extruder nr.> - select extruder in case of multi extruder printer. Selects filament position 1..MMU_FILAMENT_COUNT (T0 onward) in case of MMU.
 
   For MMU2/S / MMU3:
     T<extruder nr.> - Selects the filament position. A Gcode to load a filament to the nozzle must follow.

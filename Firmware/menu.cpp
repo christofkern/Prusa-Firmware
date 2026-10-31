@@ -13,6 +13,7 @@
 #include "language.h"
 #include "static_assert.h"
 #include "sound.h"
+#include "mmu_slot.h"
 
 #define MENU_DEPTH_MAX       7
 
@@ -233,12 +234,22 @@ static void menu_draw_item_puts_E(char type_char, const Sheet &sheet)
     lcd_putc(type_char);
 }
 
-static void menu_draw_item_puts_P(char type_char, const char* str, char num)
+static void menu_draw_item_puts_P(char type_char, const char* str, uint8_t number)
 {
     const uint8_t max_strlen = LCD_WIDTH - 3;
     lcd_putc_at(0, menu_row, menu_selection_mark());
     uint8_t len = lcd_print_pad_P(str, max_strlen);
-    lcd_putc_at((max_strlen - len) + 2, menu_row, num);
+    const uint8_t units_col = (uint8_t)((max_strlen - len) + 2);
+    // `number` is the 1-based filament label. The shared formatter takes a
+    // 0-based tool index, so filament 1 is tool 0 and filament 12 is tool 11.
+    char label[3];
+    const uint8_t written = (number == 0)
+        ? mmu_format_filament_label(label, MMU_TOOL_UNKNOWN)
+        : mmu_format_filament_label(label, (uint8_t)(number - 1));
+    if (written >= 2 && units_col > 0)
+        lcd_putc_at((uint8_t)(units_col - 1), menu_row, label[0]);
+    if (written >= 1)
+        lcd_putc_at(units_col, menu_row, label[written - 1]);
     lcd_putc_at(LCD_WIDTH - 1, menu_row, type_char);
 }
 
@@ -349,12 +360,12 @@ void menu_item_function_P(const char* str, menu_func_t func)
 //!
 //! Ideal for numbered lists calling functions with number parameter.
 //! @param str Item caption
-//! @param number aditional character to be added after str, e.g. number
+//! @param number 1-based filament label printed after str (1..MMU_FILAMENT_COUNT)
 //! @param func pointer to function taking uint8_t with no return value
 //! @param fn_par value to be passed to function
 //! @retval 0
 //! @retval 1 Item was clicked
-void menu_item_function_P(const char* str, char number, void (*func)(uint8_t), uint8_t fn_par)
+void menu_item_function_P(const char* str, uint8_t number, void (*func)(uint8_t), uint8_t fn_par)
 {
     if (menu_item == menu_line)
     {

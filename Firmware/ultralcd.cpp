@@ -35,6 +35,7 @@
 #include "sound.h"
 
 #include "mmu2.h"
+#include "mmu_slot.h"
 #include "SpoolJoin.h"
 
 #include "static_assert.h"
@@ -386,38 +387,54 @@ void lcdui_print_percent_done(void)
     lcd_printf_P(num ? _N("%3d%%"):_N("---%%"), calc_percent_done());
 }
 
-// Print extruder status (5 chars total)
-// Scenario 1: "F?"
+static_assert((uint8_t)MMU2::FILAMENT_UNKNOWN == MMU_TOOL_UNKNOWN, "MMU unknown-tool sentinel");
+static_assert(MMU_FILAMENT_COUNT >= 1, "MMU_FILAMENT_COUNT");
+static_assert(MMU_FILAMENT_COUNT <= 120, "choose_menu item count must fit in int8_t");
+
+// Print extruder status into the 5-column field reserved on the status line.
+// The returned count never exceeds MMU_EXTRUDER_STATUS_COLUMNS. The caller pads
+// the remainder. Filament numbers are 1-based, so tool 11 is shown as 12.
+// Scenario 1: " F?"
 //              There is no filament loaded and no tool change is in progress
-// Scenario 2: "F[nr.]"
-//              [nr.] ranges from 1 to 5.
+// Scenario 2: " F[nr.]" or " F10"
 //              Shows which filament is loaded. No tool change is in progress
-// Scenario 3: "?>[nr.]"
-//              [nr.] ranges from 1 to 5.
-//              There is no filament currently loaded, but [nr.] is currently being loaded via tool change
-// Scenario 4: "[nr.]>?"
-//              [nr.] ranges from 1 to 5.
+// Scenario 3: " ?>[nr.]"
+//              There is no filament currently loaded, but [nr.] is being loaded
+// Scenario 4: " [nr.]>?"
 //              This scenario indicates a bug in the firmware if ? is on the right side
-// Scenario 5: "[nr1.]>[nr2.]"
-//              [nr1.] ranges from 1 to 5.
-//              [nr2.] ranges from 1 to 5.
-//              Filament [nr1.] was loaded, but [nr2.] is currently being loaded via tool change
-// Scenario 6: "?>?"
+// Scenario 5: " [nr1.]>[nr2.]" or "10>11"
+//              Filament [nr1.] was loaded, but [nr2.] is being loaded.
+//              The leading space is dropped when both numbers have two digits.
+// Scenario 6: " ?>?"
 //              This scenario should not be possible and indicates a bug in the firmware
 uint8_t lcdui_print_extruder(void) {
-    uint8_t chars = 1;
-    lcd_space(1);
-    if (MMU2::mmu2.get_current_tool() == MMU2::mmu2.get_tool_change_tool()) {
-        lcd_putc('F');
-        lcd_putc(MMU2::mmu2.get_current_tool() == (uint8_t)MMU2::FILAMENT_UNKNOWN ? '?' : MMU2::mmu2.get_current_tool() + '1');
-        chars += 2;
-    } else {
-        lcd_putc(MMU2::mmu2.get_current_tool() == (uint8_t)MMU2::FILAMENT_UNKNOWN ? '?' : MMU2::mmu2.get_current_tool() + '1');
-        lcd_putc('>');
-        lcd_putc(MMU2::mmu2.get_tool_change_tool() == (uint8_t)MMU2::FILAMENT_UNKNOWN ? '?' : MMU2::mmu2.get_tool_change_tool() + '1');
-        chars += 3;
-    }
+    char field[MMU_EXTRUDER_STATUS_COLUMNS + 1];
+    const uint8_t chars = mmu_format_extruder_status(
+        field,
+        MMU2::mmu2.get_current_tool(),
+        MMU2::mmu2.get_tool_change_tool());
+    for (uint8_t i = 0; i < chars; ++i)
+        lcd_putc(field[i]);
     return chars;
+}
+
+void lcd_append_mmu_filament_number_P(const char *msg, uint8_t row, uint8_t tool_index) {
+    lcd_puts_at_P(0, row, msg);
+    if (tool_index == MMU_TOOL_UNKNOWN) {
+        lcd_print(' ');
+        lcd_putc('?');
+        return;
+    }
+
+    const size_t msg_len = strlen_P(msg);
+    const uint8_t cols = msg_len > 255 ? 255 : (uint8_t)msg_len;
+    if (mmu_slot_suffix_place(cols, tool_index, LCD_WIDTH) == MmuSlotSuffix::SameLineWithSpace) {
+        lcd_print(' ');
+        lcd_print((int)tool_index + 1);
+    } else if (row + 1 < LCD_HEIGHT) {
+        lcd_set_cursor(0, (uint8_t)(row + 1));
+        lcd_print((int)tool_index + 1);
+    }
 }
 
 // Print farm number (5 chars total)
@@ -681,8 +698,10 @@ void lcdui_print_status_screen(void)
 	lcdui_print_percent_done();
 
     if (MMU2::mmu2.Enabled()) {
-        // Print extruder status (5 chars)
-        lcd_space(5 - lcdui_print_extruder());
+        // Print extruder status (5 columns). Two-digit tool changes fill the field.
+        const uint8_t filament_chars = lcdui_print_extruder();
+        if (filament_chars < MMU_EXTRUDER_STATUS_COLUMNS)
+            lcd_space(MMU_EXTRUDER_STATUS_COLUMNS - filament_chars);
     } else if (farm_mode) {
         // Print farm number (5 chars)
         lcdui_print_farm();
@@ -4564,8 +4583,8 @@ static void lcd_calibration_menu()
 //!
 //! Create list of items with header. Header can not be selected.
 //! Each item has text description passed by function parameter and
-//! number. There are 5 numbered items, if MMU2::mmu2.Enabled(), 4 otherwise.
-//! Items are numbered from 1 to 4 or 5. But index returned starts at 0.
+//! number. An enabled MMU lists MMU_FILAMENT_COUNT slots (1-based labels).
+//! A disabled MMU keeps the historical 4 items. The index returned starts at 0.
 //! There can be last item with different text and no number.
 //!
 //! @param header Header text
@@ -4574,11 +4593,11 @@ static void lcd_calibration_menu()
 //! @return selected item index, first item index is 0
 uint8_t choose_menu_P(const char *header, const char *item, const char *last_item)
 {
-    //following code should handle 3 to 127 number of items well
-    const int8_t items_no = last_item?(MMU2::mmu2.Enabled()?6:5):(MMU2::mmu2.Enabled()?5:4);
+    // The window shows three rows under the header and scrolls to the last entry.
+    const int8_t items_no = mmu_choose_menu_item_count(
+        MMU2::mmu2.Enabled(), last_item != nullptr, MMU_FILAMENT_COUNT);
     const uint8_t item_len = item?strlen_P(item):0;
-	int8_t first = 0;
-	int8_t cursor_pos = 1;
+	MmuMenuCursor cursor = { 0, 1 };
 
 	lcd_clear();
 
@@ -4590,45 +4609,18 @@ uint8_t choose_menu_P(const char *header, const char *item, const char *last_ite
 
 		if (lcd_encoder)
 		{
-            if (lcd_encoder < 0)
-            {
-                cursor_pos--;
-            }
-
-            if (lcd_encoder > 0)
-            {
-                cursor_pos++;
-            }
+            const int16_t encoder = lcd_encoder;
             lcd_encoder = 0;
+            const MmuMenuMotion motion = mmu_menu_apply_encoder(cursor, encoder, items_no);
+            if (motion == MmuMenuMotion::Scrolled)
+                lcd_clear();
+            else if (motion == MmuMenuMotion::Limit)
+                Sound_MakeSound(e_SOUND_TYPE_BlindAlert);
 		}
-
-		if (cursor_pos > 3)
-		{
-            cursor_pos = 3;
-            if (first < items_no - 3)
-            {
-                first++;
-                lcd_clear();
-            } else { // here we are at the very end of the list
-				Sound_MakeSound(e_SOUND_TYPE_BlindAlert);
-            }
-        }
-
-        if (cursor_pos < 1)
-        {
-            cursor_pos = 1;
-            if (first > 0)
-            {
-                first--;
-                lcd_clear();
-            } else { // here we are at the very end of the list
-				Sound_MakeSound(e_SOUND_TYPE_BlindAlert);
-            }
-        }
 
         if (header) lcd_puts_at_P(0,0,header);
 
-        const bool last_visible = (first == items_no - 3);
+        const bool last_visible = (cursor.first == items_no - 3);
         const uint_least8_t ordinary_items = (last_item&&last_visible)?2:3;
 
         for (uint_least8_t i = 0; i < ordinary_items; i++)
@@ -4639,19 +4631,19 @@ uint8_t choose_menu_P(const char *header, const char *item, const char *last_ite
         for (uint_least8_t i = 0; i < ordinary_items; i++)
         {
             lcd_set_cursor(2 + item_len, i+1);
-            lcd_print(first + i + 1);
+            lcd_print(cursor.first + i + 1);
         }
 
         if (last_item&&last_visible) lcd_puts_at_P(1, 3, last_item);
 
         lcd_puts_at_P(0, 1, PSTR(" \n \n "));
-        lcd_putc_at(0, cursor_pos, '>');
+        lcd_putc_at(0, cursor.cursor_pos, '>');
         _delay(100);
 
 		if (lcd_clicked())
 		{
 		    KEEPALIVE_STATE(IN_HANDLER);
-			return(cursor_pos + first - 1);
+			return mmu_choose_menu_index(cursor.cursor_pos, cursor.first);
 		}
 	}
 }
@@ -4735,7 +4727,7 @@ static void lcd_disable_farm_mode()
 }
 
 static inline void load_all_wrapper(){
-    for(uint8_t i = 0; i < 5; ++i){
+    for(uint8_t i = 0; i < MMU_FILAMENT_COUNT; ++i){
         MMU2::mmu2.load_filament(i);
     }
 }
@@ -4749,7 +4741,7 @@ static void mmu_preload_filament_menu() {
     MENU_ITEM_BACK_P(_T(MSG_MAIN));
     MENU_ITEM_FUNCTION_P(_T(MSG_LOAD_ALL), load_all_wrapper);
     for (uint8_t i = 0; i < MMU_FILAMENT_COUNT; i++)
-        MENU_ITEM_FUNCTION_NR_P(_T(MSG_LOAD_FILAMENT), i + '1', load_filament_wrapper, i);
+        MENU_ITEM_FUNCTION_NR_P(_T(MSG_LOAD_FILAMENT), (uint8_t)(i + 1), load_filament_wrapper, i);
     MENU_END();
 }
 
@@ -4781,7 +4773,7 @@ static void mmu_common_choose_filament_menu(const char * label, void (*menuActio
     );
     MENU_ITEM_BACK_P(_T(MSG_MAIN));
     for (uint8_t i = 0; i < MMU_FILAMENT_COUNT; i++)
-        MENU_ITEM_FUNCTION_NR_P(label, i + '1', menuAction, i);
+        MENU_ITEM_FUNCTION_NR_P(label, (uint8_t)(i + 1), menuAction, i);
     MENU_END();
 }
 
@@ -4812,7 +4804,7 @@ static void mmu_cut_filament_menu() {
 #endif //MMU_HAS_CUTTER
 
 static inline void loading_test_all_wrapper(){
-    for(uint8_t i = 0; i < 5; ++i){
+    for(uint8_t i = 0; i < MMU_FILAMENT_COUNT; ++i){
         MMU2::mmu2.loading_test(i);
     }
 
@@ -4835,7 +4827,7 @@ static void mmu_loading_test_menu() {
     MENU_ITEM_BACK_P(_T(MSG_MAIN));
     MENU_ITEM_FUNCTION_P(_T(MSG_LOAD_ALL), loading_test_all_wrapper);
     for (uint8_t i = 0; i < MMU_FILAMENT_COUNT; i++)
-        MENU_ITEM_FUNCTION_NR_P(_T(MSG_LOAD_FILAMENT), i + '1', loading_test_wrapper, i);
+        MENU_ITEM_FUNCTION_NR_P(_T(MSG_LOAD_FILAMENT), (uint8_t)(i + 1), loading_test_wrapper, i);
     MENU_END();
 }
 

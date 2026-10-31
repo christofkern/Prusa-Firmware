@@ -8,6 +8,7 @@ include(${Catch2_SOURCE_DIR}/extras/Catch.cmake)
 set(TEST_SOURCES
 	Example_test.cpp
 	PrusaStatistics_test.cpp
+	Mmu12x_test.cpp
     #Tests/Timer_test.cpp
     #Firmware/Timer.cpp
 	)

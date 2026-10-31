@@ -6,7 +6,9 @@
 // meaning: query operation status
 // Query/command: query
 // Expected reply from the MMU:
-//  any of the running operation statuses: OID: [T|L|U|E|C|W|K][0-4]
+//  any of the running operation statuses: OID: [T|L|U|E|C|W|K]<hex>
+//  The slot is one uint8 encoded in hex, not a decimal string.
+//  Tools 0-9 are '0'-'9'. Tools 10 and 11 are 'A' and 'B' (T10 -> TA, T11 -> TB).
 //  <OID> P[0-9]      : command being processed i.e. operation running, may contain a state number
 //  <OID> E[0-9][0-9] : error 1-9 while doing a tool change
 //  <OID> F[0-9]      : operation finished - will be repeated to "Q" messages until a new command is issued

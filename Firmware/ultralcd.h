@@ -253,6 +253,11 @@ extern void lcd_experimental_menu();
 
 uint8_t lcdui_print_extruder(void);
 
+/// @brief Print a PROGMEM message and a 1-based MMU filament number.
+/// The number stays on the same row when it fits. A 20-column translation that
+/// cannot take " 10" gets the number on the following row.
+void lcd_append_mmu_filament_number_P(const char *msg, uint8_t row, uint8_t tool_index);
+
 #ifdef PINDA_TEMP_COMP
 extern void lcd_pinda_temp_compensation_toggle();
 #endif //PINDA_TEMP_COMP
