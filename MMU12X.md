@@ -80,7 +80,7 @@ Both figures are the MK3S English image for an ATmega2560. The baseline is unmod
 | v3.14.1 MK3S English | 230742 bytes (88.0%) | 5665 bytes (69.2%) |
 | This patch, MK3S English | 231306 bytes (88.2%) | 5665 bytes (69.2%) |
 
-`avr-size` on the patched image: `text 231008`, `data 298`, `bss 5367`. The patched build used for that row was a dirty worktree, so its version string is two characters longer than the clean tag. That does not account for the rest of the increase.
+`avr-size` on the patched image: `text 231008`, `data 298`, `bss 5367`. Rebuilding from commit `335dd4a` produced the same figures.
 
 ## Tests
 
